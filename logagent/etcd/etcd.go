@@ -1,6 +1,8 @@
 package etcd
 
 import (
+	"LogCollectionProject/logagent/common"
+	"LogCollectionProject/logagent/tailfile"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,13 +12,6 @@ import (
 )
 
 //etcd相关操作
-//日志收集项的数据结构
-type collectEntry struct {
-	Path string `json:"path"`//日志所在路径
-	Topic string `json:"topic"`//日志的主题
-
-}
-
 var(
 	//etcd的客户端对象
 	Client *clientv3.Client
@@ -44,7 +39,7 @@ func Init(address []string)(err error){
 	通过etcd拉取日志收集的配置项的函数
 	假定:在ectd中存有json格式的日志收集的配置项（路径）
  **/
-func GetCollectionConfig(key string)(collectEntryList []collectEntry){
+func GetCollectionConfig(key string)(collectEntryList []common.CollectEntry){
 	//get操作，设置1秒超时
 	//使用context是为了设置连接的超时时间
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -69,6 +64,30 @@ func GetCollectionConfig(key string)(collectEntryList []collectEntry){
 		return
 	}
 	return collectEntryList
+}
+
+//通过watch监听etxd中`key="collect_log_conf"`配置的变化
+func WatchConfig(collectKey string){
+	watchChan := Client.Watch(context.Background(),collectKey)
+
+	// 从通道中尝试获取值（监视的信息）
+	var newCollectEntryList []common.CollectEntry
+	for wresp := range watchChan {
+		for _, watchMsg := range wresp.Events{
+			fmt.Printf("etcd.WatchConfig: etch config chang-->Type:%v key:%s value:%s \n", watchMsg.Type, watchMsg.Kv.Key, watchMsg.Kv.Value)
+			//解析新的配置信息
+			err := json.Unmarshal(watchMsg.Kv.Value,&newCollectEntryList)
+			if err != nil {
+				fmt.Printf("etcd.WatchConfig:json.Unmarshal failed, err:%v \n", err)
+				continue
+			}
+			//告诉tailfile模块，需要收集的日志Config改变了
+			tailfile.SendNewConf(newCollectEntryList)
+			fmt.Printf("etcd.WatchConfig: newCollectEntryList:%s \n",newCollectEntryList)
+
+
+		}
+	}
 }
 
 

@@ -27,8 +27,8 @@ func main()  {
 
 	// 从通道中尝试获取值（监视的信息）
 	for wresp := range watchChan {
-		for _, msg := range wresp.Events{
-			fmt.Printf("Type:%v key:%s value:%s \n", msg.Type, msg.Kv.Key, msg.Kv.Value)
+		for _, watchMsg := range wresp.Events{
+			fmt.Printf("Type:%v key:%s value:%s \n", watchMsg.Type, watchMsg.Kv.Key, watchMsg.Kv.Value)
 		}
 	}
 }

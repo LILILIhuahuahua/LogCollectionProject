@@ -1,6 +1,7 @@
 package main
 
 import (
+	"LogCollectionProject/logagent/common"
 	"LogCollectionProject/logagent/etcd"
 	"LogCollectionProject/logagent/kafka"
 	"LogCollectionProject/logagent/tailfile"
@@ -14,7 +15,7 @@ import (
 //target:收集指定目录下的日志文件，发送到kafka中
 func main() {
 	//0.ini配置文件解析(初始化连接kafka、读取文件准备)
-	var configObj = new(Config)
+	var configObj = new(common.Config)
 	cfg , err := ini.Load("./config/config.ini")
 	if err != nil {
 		logrus.Error("load config failed,err:%v", err)
@@ -48,8 +49,12 @@ func main() {
 	//2.1从etcd中拉去需要收集的日志的配置项，方便tial去根据配置项读取日志内容
 	allConfig:=etcd.GetCollectionConfig(configObj.EtcdConfig.CollectKey)
 	fmt.Printf("allConfig:%s\n",allConfig)
-	//3.根据配置中的日志路径初始化tial
-	err = tailfile.Init(configObj.CollectionConfig.LogFilepath)
+
+	//2.2watch监听etxd中`key="collect_log_conf"`配置的变化
+	go etcd.WatchConfig(configObj.EtcdConfig.CollectKey)
+
+	//3.根据配置中的日志路径初始化tail,并让tail到对应路径收集log文件内容
+	err = tailfile.Init(allConfig)
 	if err != nil {
 		logrus.Error("tailfile:InitTailfile failed,err:%v", err)
 		return
@@ -58,18 +63,18 @@ func main() {
 
 	//4.把tial读取的日志内容通过sarama发送到kafka中
 	//tailObj --> log --> kafkaClient -->kafka
-	err = run()
-	if err!=nil{
-		logrus.Error("main:run failed,err:%v", err)
-		return
-	}
+	//tailfile.Init中完成了
+
 	fmt.Println("run logagent success")
+	for {
+
+	}
 }
 
 //真正的业务逻辑
 func run()(err error){
 	//1.通过tialObj读取日记文件,放入kafkaClient的channel中
-	tailfile.CollectLogMsg()
+	//tailfile.CollectLogMsg()
 
 	//2.从kafkaClient的channel中取出消息，发送给kafka
 	//在kafka的init中就直接执行下面的函数

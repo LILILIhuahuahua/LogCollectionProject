@@ -27,7 +27,7 @@ func main() {
 	// put操作  设置1秒超时
 	//使用context是为了设置连接的超时时间
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	_, err = cli.Put(ctx, "collect_log_conf", "[{\"path\":\"E:/Kafka/kafka_2.8/log/s5.log\",\"topic\":\"s5_log\"}]")
+	_, err = cli.Put(ctx, "collect_log_conf", "[{\"path\":\"E:/Kafka/kafka_2.8/log/s5.log\",\"topic\":\"s5_log\"},{\"path\":\"E:/Kafka/kafka_2.8/log/s6.log\",\"topic\":\"s6_log\"},{\"path\":\"E:/Kafka/kafka_2.8/log/s7.log\",\"topic\":\"s7_log\"}]\n")
 	//cancel()
 	if err != nil {
 		fmt.Printf("put to etcd failed, err:%v \n", err)
@@ -37,7 +37,7 @@ func main() {
 	// get操作，设置1秒超时
 	//使用context是为了设置连接的超时时间
 	ctx, cancel = context.WithTimeout(context.Background(), time.Second)
-	resp, err := cli.Get(ctx, "s4")
+	resp, err := cli.Get(ctx, "collect_log_conf")
 	defer cancel()
 	if err != nil {
 		fmt.Printf("get from etcd failed, err:%v \n", err)
