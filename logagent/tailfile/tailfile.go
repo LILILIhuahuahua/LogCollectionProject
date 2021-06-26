@@ -3,6 +3,7 @@ package tailfile
 import (
 	"LogCollectionProject/logagent/common"
 	"LogCollectionProject/logagent/kafka"
+	"context"
 	"fmt"
 	"github.com/hpcloud/tail"
 	"github.com/sirupsen/logrus"
@@ -15,6 +16,8 @@ type tailTask struct {
 	path string
 	topic string
 	tailObj *tail.Tail
+	ctx context.Context
+	cancel context.CancelFunc
 }
 
 var(
@@ -47,7 +50,7 @@ func Init(allConfig []common.CollectEntry)(err error){
 
 
 	//3.TTaskManager不断监听新的配置 (从SendNewConf不断取新的config)
-	TTaskManager.watch()
+	go TTaskManager.watch()
 
 	return
 }
@@ -65,22 +68,30 @@ func (ttask *tailTask)CollectLogMsg(){
 		ok bool
 	)
 	//读取文件的每一行,封装成kafka中msg类型，丢到kafka的channel中
+
 	for {
-		lineMsg, ok = <-ttask.tailObj.Lines
-		if !ok {
-			logrus.Warnf("tail file fial open file, filename:%s\n",
-				ttask.tailObj.Filename)
-			//读取出错，等一秒在读
-			time.Sleep(time.Second)
-			continue
+		//通过context优雅的关闭gorutine
+		select {
+		case <-ttask.ctx.Done():
+			fmt.Printf("关闭一个ttask.CollectLogMsg的gorutine , path：%s\n",ttask.path)
+			return
+		case lineMsg, ok = <-ttask.tailObj.Lines:
+			if !ok {
+				logrus.Warnf("tail file fial open file, filename:%s\n",
+					ttask.tailObj.Filename)
+				//读取出错，等一秒在读
+				time.Sleep(time.Second)
+				continue
+			}
+			if len(strings.Trim(lineMsg.Text,"\r"))==0{
+				continue
+			}
+			//2.读取到的一行msg封装成kafka中msg类型，丢到kafka的channel中
+			fmt.Printf("len = %v  ,readLog-lineMsg:%v\n",len(lineMsg.Text),lineMsg.Text)
+			kafkaMsg := kafka.ToKafkaMsg("shopping", lineMsg.Text)
+			kafka.MsgChan <- kafkaMsg
 		}
-		if len(strings.Trim(lineMsg.Text,"\r"))==0{
-			continue
-		}
-		//2.读取到的一行msg封装成kafka中msg类型，丢到kafka的channel中
-		fmt.Printf("len = %v  ,readLog-lineMsg:%v\n",len(lineMsg.Text),lineMsg.Text)
-		kafkaMsg := kafka.ToKafkaMsg("shopping", lineMsg.Text)
-		kafka.MsgChan <- kafkaMsg
+
 	}
 }
 
@@ -92,10 +103,13 @@ func Run(tailTaskManager tailTaskManager,colEntry common.CollectEntry)(err error
 		logrus.Errorf("tailfile.Init: create tailObj failed,path:%s\n",colEntry.Path)
 		return err
 	}
+	ctx,cancel :=context.WithCancel(context.Background())
 	ttask :=tailTask{
 		path:colEntry.Path,
 		topic: colEntry.Topic,
 		tailObj: TailObj,
+		ctx: ctx,
+		cancel: cancel,
 	}
 	//创建一个ttask就交给tailTaskManager管理,方便后续管理
 	tailTaskManager.tailTaskMap[ttask.path] = &ttask
