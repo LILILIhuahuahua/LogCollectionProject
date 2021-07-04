@@ -30,7 +30,6 @@ func Init(address []string)(err error){
 		return err
 	}
 	fmt.Println("etcd:connect to etcd success")
-
 	return
 }
 

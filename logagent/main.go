@@ -16,7 +16,7 @@ import (
 func main() {
 	//0.ini配置文件解析(初始化连接kafka、读取文件准备)
 	var configObj = new(common.Config)
-	cfg , err := ini.Load("./config/config.ini")
+	cfg , err := ini.Load("logagent/config/config.ini")
 	if err != nil {
 		logrus.Error("load config failed,err:%v", err)
 		return

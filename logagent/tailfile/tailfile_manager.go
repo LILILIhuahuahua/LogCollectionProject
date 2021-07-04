@@ -22,6 +22,7 @@ var (
 	TTaskManager tailTaskManager
 )
 
+//初始化TTManager对象
 func InitTailTaskManager(allConf []common.CollectEntry) tailTaskManager{
 	TTaskManager = tailTaskManager{
 		tailTaskMap: make(map[string]*tailTask,20),
@@ -41,15 +42,15 @@ func(ttManager tailTaskManager) watch(){
 		//2、判断是否是新的配置
 		for _,newConf :=range newConfs {
 			if ttManager.isConfExist(newConf) {
-				//旧的配置
+				//2.1旧的配置
 				continue
 			}
-			//新的配置
+			//2.2新的配置
 			//根据每个收集日志项，创建并启动一个tail
 			Run(ttManager,newConf)
 		}
 
-		//将newConf中不存在，而tailTakMap中存在的收集项对应的tailObj关掉
+		//2.3将newConf中不存在，而tailTakMap中存在的收集项对应的tailObj关掉
 		for key,ttask :=range ttManager.tailTaskMap {
 			var found bool
 			for _,conf :=range newConfs{
